@@ -11,6 +11,22 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
 class UKF {
+private:
+  void GenerateSigmaPoints(MatrixXd* Xsig_out);
+  void AugmentedSigmaPoints(MatrixXd* Xsig_out);
+  void SigmaPointPrediction(double delta_t, MatrixXd &Xsig_aug);
+  void PredictMeanAndCovariance();
+  void PredictRadarMeasurement(VectorXd* z_out, MatrixXd* S_out);
+  void UpdateState(VectorXd* x_out, MatrixXd* P_out);
+
+  // previous timestamp
+  long long previous_timestamp_;
+  MatrixXd R_radar_;
+  MatrixXd R_laser_;
+  MatrixXd NIS_laser_;
+  MatrixXd NIS_radar_;
+  int n_sigma_points_;
+
 public:
 
   ///* initially set to false, set to true in first call of ProcessMeasurement
@@ -66,6 +82,8 @@ public:
 
   ///* Sigma point spreading parameter
   double lambda_;
+
+
 
 
   /**
