@@ -2,6 +2,8 @@
 #include "Eigen/Dense"
 #include <iostream>
 
+#define EPS 0.001
+
 using namespace std;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -35,10 +37,10 @@ UKF::UKF() {
   P_ = MatrixXd( n_x_,  n_x_);
   
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 3; // initial 30
+  std_a_ = 1.5; // initial 30
   
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.60;  // initial 3
+  std_yawdd_ = 0.5;  // initial 30
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -56,17 +58,9 @@ UKF::UKF() {
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
   //DO NOT MODIFY measurement noise values above these are provided by the sensor manufacturer.
-  
-  /**
-   TODO:
-   
-   Complete the initialization. See ukf.h for other member properties.
-   
-   Hint: one or more values initialized above might be wildly off...
-   */
+
   
   Xsig_pred_ = MatrixXd(n_x_, n_sigma_points_);
-  // Note that setting zero is very important
   Xsig_pred_.setZero();
   
   is_initialized_ = false;
@@ -86,10 +80,72 @@ UKF::UKF() {
     double weight = 0.5/(n_aug_+lambda_);
     weights_(i) = weight;
   }
+
+  // the current NIS for radar
+  NIS_radar_ = 0.0;
+
+  // the current NIS for laser
+  NIS_laser_ = 0.0;
   
 }
 
 UKF::~UKF() {}
+
+/**
+ * @param {MeasurementPackage} meas_package The first measurement data of
+ * either radar or laser.
+ */
+void UKF::Init(MeasurementPackage meas_package) {
+
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    // tconvert from polar to cartesian coordinates
+
+    float ro =  meas_package.raw_measurements_[0];
+    float theta =  meas_package.raw_measurements_[1];
+    float rhodot = meas_package.raw_measurements_[2];
+
+    float px = cos(theta) * ro;
+    float py = sin(theta) * ro;
+
+    P_ <<   MatrixXd::Identity(n_x_,n_x_);
+    //P_(0,0) = std_radr_*std_radr_; //
+    //P_(1,1) = std_radr_*std_radr_;
+    //P_(1,1) = std_radr_*std_radr_;
+    //P_(3,3) = std_radphi_*std_radphi_;
+    //P_(4,4) = std_radrd_*std_radrd_;
+
+    x_ << px, py, 4, 0, 0;
+  } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+    float px = meas_package.raw_measurements_[0];
+    float py = meas_package.raw_measurements_[1];
+
+    P_ <<  MatrixXd::Identity(n_x_,n_x_);
+    //P_(0,0) = std_laspx_ * std_laspx_; //
+    //P_(1,1) = std_laspy_ * std_laspy_;
+    //P_(4,4) = std_laspy_ * std_laspx_;
+
+    x_ << px, py, 0, 0, 0;
+    // Deal with the special case initialisation problems
+    if (fabs(x_(0)) < EPS and fabs(x_(1)) < EPS){
+      x_(0) = EPS;
+      x_(1) = EPS;
+    }
+  }
+
+
+  previous_timestamp_ = meas_package.timestamp_;
+
+  // done initializing, no need to predict or update
+  is_initialized_ = true;
+}
+
+/**
+ *  Angle normalization to [-Pi, Pi]
+ */
+void UKF::NormAng(double *ang) {
+  while (*ang > M_PI) *ang -= 2. * M_PI;
+  while (*ang < -M_PI) *ang += 2. * M_PI;
+}
 
 /**
  * @param {MeasurementPackage} meas_package The latest measurement data of
@@ -100,63 +156,28 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
    *  Initialization
    ****************************************************************************/
   if (!is_initialized_) {
-    // first measurement
-    cout << "EKF: " << endl;
-    
-    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
-      // tconvert from polar to cartesian coordinates
-      
-      float ro =  meas_package.raw_measurements_[0];
-      float theta =  meas_package.raw_measurements_[1];
-      float ro_dot =  meas_package.raw_measurements_[2];
-      
-      float px = cos(theta) * ro;
-      float py = sin(theta) * ro;
-      float vx = cos(theta) * ro_dot;
-      float vy = sin(theta) * ro_dot;
-      
-      P_ <<   MatrixXd::Identity(n_x_,n_x_);
-      
-      x_ << px, py, 0, 0, 0;
-    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      float px = meas_package.raw_measurements_[0];
-      float py = meas_package.raw_measurements_[1];
-      
-      P_ <<  MatrixXd::Identity(n_x_,n_x_);
-      
-      x_ << px, py, 0, 0, 0;
-    }
-    
-    
-    previous_timestamp_ = meas_package.timestamp_;
-    
-    // done initializing, no need to predict or update
-    is_initialized_ = true;
-    return;
-  }
-  
-  
-  // compute the time elapsed between the current and previous measurements
-  float dt = (meas_package.timestamp_ - previous_timestamp_) / 1000000.0;    // dt - expressed in seconds
-  previous_timestamp_ = meas_package.timestamp_;
-  
-  /*****************************************************************************
-   *  Prediction
-   ****************************************************************************/
-  Prediction(dt);
-  
-  /*****************************************************************************
-   *  Update
-   ****************************************************************************/
-  if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
-    UpdateRadar(meas_package);
+    Init(meas_package);
   } else {
-    UpdateLidar(meas_package);
+
+
+    // compute the time elapsed between the current and previous measurements
+    float dt = (meas_package.timestamp_ - previous_timestamp_) / 1000000.0;    // dt - expressed in seconds
+    previous_timestamp_ = meas_package.timestamp_;
+
+    /*****************************************************************************
+     *  Prediction
+     ****************************************************************************/
+    Prediction(dt);
+
+    /*****************************************************************************
+     *  Update
+     ****************************************************************************/
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
+      UpdateRadar(meas_package);
+    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
+      UpdateLidar(meas_package);
+    }
   }
-  
-  // print the output
-  cout << "x_ = " << x_ << endl;
-  cout << "P_ = " << P_ << endl;
 }
 
 /**
@@ -198,16 +219,10 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   
   //add measurement noise covariance matrix
   S = S + R_laser_;
-  
-  //create example vector for incoming radar measurement
-  VectorXd z = VectorXd(n_z);
-  z <<
-  meas_package.raw_measurements_(0), //px
-  meas_package.raw_measurements_(1); //py
 
-  UpdateState(Zsig, S, z_pred, z);
-  
-  NIS_laser_ = z.transpose() * S.inverse() * z;
+
+  UpdateState(Zsig, S, z_pred, meas_package, n_z);
+
 }
 
 /**
@@ -251,16 +266,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //add measurement noise covariance matrix
   S = S + R_radar_;
 
-  //create example vector for incoming radar measurement
-  VectorXd z = VectorXd(n_z);
-  z <<
-  meas_package.raw_measurements_(0), //r
-  meas_package.raw_measurements_(1), //phi
-  meas_package.raw_measurements_(2); //r_dot
+  UpdateState(Zsig, S, z_pred, meas_package, n_z);
 
-  UpdateState(Zsig, S, z_pred, z);
-  
-  NIS_radar_ = z.transpose() * S.inverse() * z;
 }
 
 
@@ -278,8 +285,7 @@ void UKF::PredictMeanAndCovariance() {
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    NormAng(&x_diff(3));
     
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose() ;
   }
@@ -300,8 +306,7 @@ void UKF::MeasurementMeanAndCovariance(const MatrixXd &Zsig, VectorXd &z_pred, M
     VectorXd z_diff = Zsig.col(i) - z_pred;
 
     //angle normalization
-    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    NormAng(&z_diff(1));
 
     S = S + weights_(i) * z_diff * z_diff.transpose();
   }
@@ -354,7 +359,7 @@ void UKF::PredictSigmaPoints(MatrixXd &Xsig_aug, double delta_t) {
     double px_p, py_p;
 
     //avoid division by zero
-    if (fabs(yawd) > 0.001) {
+    if (fabs(yawd) > EPS) {
       px_p = p_x + v/yawd * ( sin (yaw + yawd*delta_t) - sin(yaw));
       py_p = p_y + v/yawd * ( cos(yaw) - cos(yaw+yawd*delta_t) );
     }
@@ -384,10 +389,24 @@ void UKF::PredictSigmaPoints(MatrixXd &Xsig_aug, double delta_t) {
   }
 }
 
-void UKF::UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, VectorXd &z) {
+void UKF::UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, MeasurementPackage meas_package, int n_z) {
+  // Mean predicted measurement
+
+  VectorXd z = VectorXd(n_z);
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    z <<
+      meas_package.raw_measurements_(0), //r
+      meas_package.raw_measurements_(1), //phi
+      meas_package.raw_measurements_(2); //r_dot
+  } else {
+    z <<
+      meas_package.raw_measurements_(0), //px
+      meas_package.raw_measurements_(1); //py
+  }
+
   //create matrix for cross correlation Tc
 
-  MatrixXd Tc = MatrixXd(n_x_, Zsig.rows());
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
 
   //calculate cross correlation matrix
   Tc.fill(0.0);
@@ -396,14 +415,14 @@ void UKF::UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, VectorXd &z
     //residual
     VectorXd z_diff = Zsig.col(i) - z_pred;
     //angle normalization
-    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+      NormAng(&z_diff(1));
+    }
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    NormAng(&x_diff(3));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -421,6 +440,12 @@ void UKF::UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, VectorXd &z
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
+
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    NIS_radar_ = z.transpose() * S.inverse() * z;
+  } else {
+    NIS_laser_ = z.transpose() * S.inverse() * z;
+  }
 }
 
 

@@ -12,19 +12,18 @@ using Eigen::VectorXd;
 
 class UKF {
 private:
+  void Init(MeasurementPackage meas_package);
   void PredictMeanAndCovariance();
   void AugmentedSigmaPoints(MatrixXd &Xsig_aug);
   void PredictSigmaPoints(MatrixXd &Xsig_aug, double delta_t);
-  void UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, VectorXd &z);
+  void UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, MeasurementPackage meas_package, int n_z);
   void MeasurementMeanAndCovariance(const MatrixXd &Zsig, VectorXd &z_pred, MatrixXd &S);
+  void NormAng(double *ang);
 
   // previous timestamp
   long long previous_timestamp_;
   MatrixXd R_radar_;
   MatrixXd R_laser_;
-  MatrixXd NIS_laser_;
-  MatrixXd NIS_radar_;
-  int n_sigma_points_;
 
 public:
 
@@ -79,10 +78,17 @@ public:
   ///* Augmented state dimension
   int n_aug_;
 
+  ///* Number of sigma points
+  int n_sigma_points_;
+
   ///* Sigma point spreading parameter
   double lambda_;
 
+  // the current NIS for radar
+  double NIS_radar_ = 0.0;
 
+  // the current NIS for laser
+  double NIS_laser_ = 0.0;
 
 
   /**
