@@ -12,12 +12,11 @@ using Eigen::VectorXd;
 
 class UKF {
 private:
-  void GenerateSigmaPoints(MatrixXd* Xsig_out);
-  void AugmentedSigmaPoints(MatrixXd* Xsig_out);
-  void SigmaPointPrediction(double delta_t, MatrixXd &Xsig_aug);
   void PredictMeanAndCovariance();
-  void PredictRadarMeasurement(VectorXd* z_out, MatrixXd* S_out);
-  void UpdateState(VectorXd* x_out, MatrixXd* P_out);
+  void AugmentedSigmaPoints(MatrixXd &Xsig_aug);
+  void PredictSigmaPoints(MatrixXd &Xsig_aug, double delta_t);
+  void UpdateState(MatrixXd &Zsig, MatrixXd &S, VectorXd &z_pred, VectorXd &z);
+  void MeasurementMeanAndCovariance(const MatrixXd &Zsig, VectorXd &z_pred, MatrixXd &S);
 
   // previous timestamp
   long long previous_timestamp_;
@@ -37,7 +36,7 @@ public:
 
   ///* if this is false, radar measurements will be ignored (except for init)
   bool use_radar_;
-
+  
   ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
   VectorXd x_;
 
