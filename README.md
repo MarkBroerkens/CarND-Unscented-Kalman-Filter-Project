@@ -1,7 +1,7 @@
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
 # The Project
-In this project utilize an Unscented Kalman Filter to estimate the state of a moving object of interest with noisy lidar and radar measurements.
+In this project an Unscented Kalman Filter is used to estimate the state of a moving object of interest with noisy lidar and radar measurements.
 
 [//]: # (Image References)
 
@@ -67,4 +67,3 @@ The results for dataset 1 are shown in the following image
 
 The results for dataset 2 are shown in the following image
 ![alt text][image2]
-
