@@ -67,3 +67,20 @@ The results for dataset 1 are shown in the following image
 
 The results for dataset 2 are shown in the following image
 ![alt text][image2]
+
+## Further Reading
+For further reading and to dive deeper into the concept of UKF and basic filtering I suggest these materials which I enjoyed reading and watching:
+
+If you need math behind the Kalman Filter then this youtube series is awesome: [THE KALMAN FILTER](https://www.youtube.com/playlist?list=PLX2gX-ftPVXU3oUFNATxGXY90AULiqnWT)
+
+This interactive tutorial is very helpful to visualize and have a better grasp of workings in this area: The Extended Kalman Filter: [An Interactive Tutorial for Non-Experts](https://home.wlu.edu/~levys/kalman_tutorial/)
+
+If you are looking for what other filters might be apart from EKF and UKF then you can check this. It's little math heavy and based on Matlab: [Optimal Filtering with Kalman Filters and Smoothers](https://docs.google.com/viewer?url=http%3A%2F%2Fbecs.aalto.fi%2Fen%2Fresearch%2Fbayes%2Fekfukf%2Fdocumentation.pdf)
+
+A nice explanation of choosing between EKF and UKF and then it's implementation guide. It's in two parts: [Understanding Nonlinear Kalman Filters Part I](https://docs.google.com/viewer?url=https%3A%2F%2Fweb.statler.wvu.edu%2F~irl%2FIRL_WVU_Online_EKF_vs_UKF_V1.0_06_28_2013.pdf)
+
+And [Part II](https://docs.google.com/viewer?url=https%3A%2F%2Fweb.statler.wvu.edu%2F~irl%2FIRL_WVU_Online_UKF_Implementation_V1.0_06_28_2013.pdf)
+
+A Python library for Kalman filtering which you can check out: [pykalman](https://pykalman.github.io/)
+
+The UKF paper: [The Unscented Kalman Filter for Nonlinear Estimation](https://docs.google.com/viewer?url=https%3A%2F%2Fwww.seas.harvard.edu%2Fcourses%2Fcs281%2Fpapers%2Funscented.pdf)
